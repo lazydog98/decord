@@ -2,8 +2,14 @@ name: Build Decord with CUDA (Windows)
 
 on:
   push:
-    branches: [main]
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   build:
@@ -28,33 +34,60 @@ jobs:
           "nvml_dev",
           "visual_studio_integration"
         ]'
+      
+    - name: Verify CUDA Installation
+      run: |
+        echo "CUDA_PATH: $env:CUDA_PATH"
+        echo "PATH: $env:PATH"
+        nvcc --version
+        if (-not (Test-Path "$env:CUDA_PATH\lib\x64\nvcuvid.lib")) {
+          Write-Error "nvcuvid.lib not found at $env:CUDA_PATH\lib\x64\nvcuvid.lib"
+          exit 1
+        }
+      shell: powershell
 
     - name: Install NVIDIA Video Codec SDK
       run: |
         # Download and extract Video Codec SDK headers
         $url = "https://github.com/FFmpeg/nv-codec-headers/archive/refs/heads/master.zip"
+        Write-Host "Downloading NVIDIA Video Codec SDK headers..."
         Invoke-WebRequest -Uri $url -OutFile "nv-codec-headers.zip"
         Expand-Archive -Path "nv-codec-headers.zip" -DestinationPath "."
         
         # Copy headers to CUDA include directory
-        $cudaPath = $env:CUDA_PATH
-        Copy-Item -Path "nv-codec-headers-master\include\*" -Destination "$cudaPath\include\" -Recurse -Force
+        Write-Host "CUDA_PATH: $env:CUDA_PATH"
+        if (-not $env:CUDA_PATH) {
+          Write-Error "CUDA_PATH environment variable is not set"
+          exit 1
+        }
+        
+        $includeDestination = "$env:CUDA_PATH\include"
+        Write-Host "Copying headers to: $includeDestination"
+        Copy-Item -Path "nv-codec-headers-master\include\*" -Destination $includeDestination -Recurse -Force
         
         # Verify nvcuvid.lib exists
-        if (Test-Path "$cudaPath\lib\x64\nvcuvid.lib") {
-          Write-Host "nvcuvid.lib found at $cudaPath\lib\x64\nvcuvid.lib"
+        $nvcuvidLib = "$env:CUDA_PATH\lib\x64\nvcuvid.lib"
+        if (Test-Path $nvcuvidLib) {
+          Write-Host "nvcuvid.lib found at $nvcuvidLib"
         } else {
-          Write-Host "Warning: nvcuvid.lib not found. NVDEC may not work properly."
+          Write-Error "nvcuvid.lib not found at $nvcuvidLib. NVDEC will not work."
+          exit 1
         }
+        
+        # List installed headers for verification
+        Write-Host "Installed NVDEC headers:"
+        Get-ChildItem "$includeDestination\*nvenc*", "$includeDestination\*nvdec*", "$includeDestination\*cuvid*" -ErrorAction SilentlyContinue
       shell: powershell
 
     - name: Install FFmpeg
       run: |
         choco install ffmpeg -y
-        refreshenv
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
+        ffmpeg -version
+      shell: powershell
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
@@ -62,36 +95,63 @@ jobs:
       run: |
         pip install wheel numpy cython setuptools
         choco install cmake -y
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
+        cmake --version
+      shell: powershell
 
     - name: Install Visual Studio Build Tools
-      uses: microsoft/setup-msbuild@v1.3
+      uses: microsoft/setup-msbuild@v2
 
     - name: Configure CMake with CUDA
       run: |
         mkdir build
         cd build
+        echo "Using CUDA_PATH: $env:CUDA_PATH"
         cmake .. -DUSE_CUDA=ON -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64
-      env:
-        CUDA_PATH: ${{ env.CUDA_PATH }}
+      shell: powershell
 
     - name: Build C++ Library
       run: |
         cd build
+        echo "Building C++ library..."
         cmake --build . --config Release --parallel
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "C++ build failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+        echo "C++ library build completed successfully"
+      shell: powershell
 
     - name: Build Python Wheel
       run: |
         cd python
+        echo "Using CUDA_PATH: $env:CUDA_PATH"
+        echo "Building Python extensions..."
         python setup.py build_ext --inplace
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Python extension build failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+        echo "Building wheel..."
         python setup.py bdist_wheel
-      env:
-        CUDA_PATH: ${{ env.CUDA_PATH }}
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Wheel build failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+        echo "Python wheel build completed successfully"
+        echo "Generated wheels:"
+        Get-ChildItem dist/*.whl
+      shell: powershell
 
     - name: Test Import
       run: |
         cd python
+        echo "Installing wheel..."
         pip install dist/*.whl
-        python -c "import decord; print('Decord version:', decord.__version__); print('CUDA support:', hasattr(decord, 'gpu'))"
+        echo "Testing Decord import and CUDA support..."
+        python -c "import decord; print('Decord version:', decord.__version__); print('CUDA support:', hasattr(decord, 'gpu')); import decord.ndarray as nd; print('NDArray module loaded successfully')"
+        echo "Import test completed successfully"
+      shell: powershell
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
