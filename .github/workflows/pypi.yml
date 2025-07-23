@@ -66,9 +66,9 @@ jobs:
         sudo find . -type f -iname "decord*.whl" -exec bash -c 'mv $1 ${1/\cp36-cp36m/py3-none}' -- {} \;
         ls -lh .
     - name: Store the source distribution
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: python-package-distributions-linux
         path: python/dist/*.whl
         retention-days: 14
         if-no-files-found: error
@@ -78,11 +78,11 @@ jobs:
       matrix:
         python-version: [3.6, 3.7, 3.8]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -123,9 +123,9 @@ jobs:
         find ./python/dist/fixed_wheel -type f -iname "decord*.whl" -exec sh -c "python -m pip install '{}'" \;
         python -m nose -v ./tests/python/unittests/test_video_reader.py
     - name: Store the source distribution
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: python-package-distributions-macos
         path: python/dist/fixed_wheel/*.whl
         retention-days: 14
         if-no-files-found: error
@@ -133,20 +133,21 @@ jobs:
     runs-on: windows-2019
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v4
       with:
-        python-version: '3.6'
+        python-version: '3.8'
         architecture: 'x64'
     - name: Install CUDA Toolkit
       uses: Jimver/cuda-toolkit@v0.2.26
       id: cuda-toolkit
       with:
-          cuda: '12.6.0'
-          method: 'network'
+        cuda: '12.6.0'
+        method: 'network'
         sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
+        use-github-cache: false
     - name: Verify CUDA installation
       run: |
         echo "CUDA installation path: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
@@ -166,7 +167,7 @@ jobs:
         dir d:/ffmpeg-4.2.1-win64-dev/include
         cmake --version
         mkdir build && cd build
-        cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DUSE_CUDA=ON -DCudaToolkitDir="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" -DCMAKE_CUDA_COMPILER="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\\bin\\nvcc.exe" -DCMAKE_CUDA_ARCHITECTURES="60;61;70;75;80;86" -DFFMPEG_INCLUDE_DIR="d:/ffmpeg-4.2.1-win64-dev/include" -DFFMPEG_LIBRARIES="d:/ffmpeg-4.2.1-win64-dev/lib/*.lib" ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DUSE_CUDA=ON -DCudaToolkitDir="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" -DCMAKE_CUDA_COMPILER="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\\bin\\nvcc.exe" -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" -DFFMPEG_INCLUDE_DIR="d:/ffmpeg-4.2.1-win64-dev/include" -DFFMPEG_LIBRARIES="d:/ffmpeg-4.2.1-win64-dev/lib/*.lib" ..
     - name: Build
       run: |
         cmake --build build --config Release
@@ -208,9 +209,9 @@ jobs:
         python -m pip install --force-reinstall --no-cache-dir %wheel_name%
         python -m nose -v ../../../tests/python/unittests/test_video_reader.py
     - name: Store the source distribution
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: python-package-distributions-windows
         path: python/dist/output/*.whl
         retention-days: 14
         if-no-files-found: error
@@ -223,10 +224,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v2
+    - name: Download Linux distributions
+      uses: actions/download-artifact@v4
       with:
-        name: python-package-distributions
+        name: python-package-distributions-linux
+        path: dist/
+    - name: Download macOS distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions-macos
+        path: dist/
+    - name: Download Windows distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions-windows
         path: dist/
     - name: List artifects
       run: |

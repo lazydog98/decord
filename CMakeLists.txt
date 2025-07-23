@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.8.2)
-project(decord C CXX)
 
 # Utility functions
 include(cmake/util/Util.cmake)
@@ -22,7 +21,7 @@ endif()
 decord_option(USE_CUDA "Build with CUDA" OFF)
 decord_option(USE_MSVC_MT "Build with MT" OFF)
 
-# Project
+# Project declaration with conditional CUDA support
 if(USE_CUDA)
   # Enable CUDA language support
   enable_language(CUDA)

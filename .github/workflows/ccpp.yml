@@ -10,7 +10,7 @@ jobs:
   build-cpu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: install dependencies
@@ -27,13 +27,12 @@ jobs:
   build-cuda:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Free Disk Space
-      uses: jlumbroso/free-disk-space@main
+      uses: jlumbroso/free-disk-space@v1.3.1
       with:
-        tool-cache: false
         android: true
         dotnet: true
         haskell: true
@@ -46,6 +45,7 @@ jobs:
         cuda: '12.6.0'
         method: 'network'
         sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
+        use-github-cache: false
     - name: Verify CUDA installation
       run: |
         echo "CUDA installation path: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
@@ -57,7 +57,7 @@ jobs:
     - name: Configure with CUDA
       run: |
         mkdir build && cd build
-        cmake .. -DUSE_CUDA=ON -DCMAKE_CUDA_COMPILER=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES="60;61;70;75;80;86"
+        cmake .. -DUSE_CUDA=ON -DCMAKE_CUDA_COMPILER=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90"
     - name: Build
       run: cd build && make -j$(nproc)
     - name: Python install
