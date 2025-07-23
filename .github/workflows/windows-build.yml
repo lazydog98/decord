@@ -21,33 +21,13 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install CUDA Toolkit with verbose logging and retry
-      run: |
-        $installer = "C:\hostedtoolcache\windows\cuda_installer-windows\11.8.0\x64\cuda_installer-windows-10.0.20348_11.8.0.exe"
-        $args = "-s nvcc_11.8 cudart_11.8 nvrtc_11.8 cublas_11.8 nvml_dev_11.8 visual_studio_integration_11.8 nvdecode_11.8 nvencode_11.8"
-        $maxRetries = 3
-        for ($i=1; $i -le $maxRetries; $i++) {
-          Write-Host "Attempt ${i}: Installing CUDA Toolkit..."
-          try {
-            Start-Process -FilePath $installer -ArgumentList $args -Wait -NoNewWindow -PassThru
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "CUDA Toolkit installed successfully."
-              break
-            } else {
-              Write-Host "Installer exited with code $LASTEXITCODE"
-            }
-          } catch {
-            Write-Host "Installer failed: $_"
-          }
-          if ($i -lt $maxRetries) {
-            Write-Host "Retrying in 10 seconds..."
-            Start-Sleep -Seconds 10
-          } else {
-            Write-Error "CUDA Toolkit installation failed after $maxRetries attempts."
-            exit 1
-          }
-        }
-      shell: powershell
+    - name: Install CUDA Toolkit
+      uses: Jimver/cuda-toolkit@v0.2.11
+      id: cuda-toolkit
+      with:
+        cuda: '11.8.0'
+        method: 'network'
+        sub-packages: '["nvcc", "cudart", "nvrtc", "cublas", "nvml_dev", "visual_studio_integration", "nvdecode", "nvencode"]'
       
     - name: Set CUDA_PATH Environment Variable
       run: |
