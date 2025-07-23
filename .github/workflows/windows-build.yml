@@ -22,69 +22,9 @@ jobs:
         submodules: recursive
 
     - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.14
-      id: cuda-toolkit
-      with:
-        cuda: '12.4.1'
-        method: 'network'
-        use-github-cache: false
-      
-    - name: Set CUDA_PATH Environment Variable
       run: |
-        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
-        echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
-        $env:CUDA_PATH = $cudaPath
-        echo "CUDA_PATH set to: $env:CUDA_PATH"
-        
-        # Verify CUDA installation directory exists
-        if (Test-Path $cudaPath) {
-          echo "CUDA installation directory found at: $cudaPath"
-        } else {
-          echo "Warning: CUDA installation directory not found at expected location"
-          echo "Searching for CUDA installation..."
-          $possiblePaths = @(
-            "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
-            "C:\Program Files (x86)\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
-            "$env:ProgramFiles\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
-          )
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              echo "Found CUDA at: $path"
-              echo "CUDA_PATH=$path" >> $env:GITHUB_ENV
-              $env:CUDA_PATH = $path
-              break
-            }
-          }
-        }
-      shell: powershell
-      
-    - name: Set CUDA_PATH Environment Variable
-      run: |
-        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
-        echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
-        $env:CUDA_PATH = $cudaPath
-        echo "CUDA_PATH set to: $env:CUDA_PATH"
-        
-        # Verify CUDA installation directory exists
-        if (Test-Path $cudaPath) {
-          echo "CUDA installation directory found at: $cudaPath"
-        } else {
-          echo "Warning: CUDA installation directory not found at expected location"
-          echo "Searching for CUDA installation..."
-          $possiblePaths = @(
-            "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
-            "C:\Program Files (x86)\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
-            "$env:ProgramFiles\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
-          )
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              echo "Found CUDA at: $path"
-              echo "CUDA_PATH=$path" >> $env:GITHUB_ENV
-              $env:CUDA_PATH = $path
-              break
-            }
-          }
-        }
+        choco install cuda --version=12.4 -y --force
+        echo "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4" >> $env:GITHUB_ENV
       shell: powershell
       
     - name: Verify CUDA Installation
@@ -141,8 +81,7 @@ jobs:
         # Check for nvcuvid.lib in multiple possible locations
         $nvcuvidLocations = @(
           "$env:CUDA_PATH\lib\x64\nvcuvid.lib",
-          "$env:CUDA_PATH\lib\nvcuvid.lib",
-          "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\lib\x64\nvcuvid.lib"
+          "$env:CUDA_PATH\lib\nvcuvid.lib"
         )
         
         $nvcuvidFound = $false
