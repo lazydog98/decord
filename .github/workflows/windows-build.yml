@@ -29,7 +29,7 @@ jobs:
       continue-on-error: true
 
     - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.26
+      uses: Jimver/cuda-toolkit@v0.2.24
       id: cuda-toolkit
       with:
         cuda: '12.5.0'
