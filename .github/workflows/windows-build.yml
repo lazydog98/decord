@@ -25,13 +25,13 @@ jobs:
       uses: Jimver/cuda-toolkit@v0.2.14
       id: cuda-toolkit
       with:
-        cuda: '11.8.0'
+        cuda: '12.4.0'
         method: 'network'
         use-github-cache: false
       
     - name: Set CUDA_PATH Environment Variable
       run: |
-        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
+        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
         echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
         $env:CUDA_PATH = $cudaPath
         echo "CUDA_PATH set to: $env:CUDA_PATH"
