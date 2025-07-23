@@ -38,6 +38,12 @@ jobs:
         haskell: true
         large-packages: true
         swap-storage: true
+    - name: Clear any existing CUDA cache
+      run: |
+        sudo rm -rf "$RUNNER_TOOL_CACHE/cuda" || true
+        rm -rf "$GITHUB_WORKSPACE/.cuda-cache" || true
+      continue-on-error: true
+
     - name: Install CUDA Toolkit
       uses: Jimver/cuda-toolkit@v0.2.26
       id: cuda-toolkit
@@ -46,6 +52,7 @@ jobs:
         method: 'local'
         sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
         use-github-cache: false
+        log-file-suffix: 'ccpp-linux.txt'
     - name: Verify CUDA installation
       run: |
         echo "CUDA installation path: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"

@@ -17,6 +17,17 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Clear any existing CUDA cache
+      run: |
+        if (Test-Path "$env:RUNNER_TOOL_CACHE\cuda") {
+          Remove-Item -Recurse -Force "$env:RUNNER_TOOL_CACHE\cuda"
+        }
+        if (Test-Path "$env:GITHUB_WORKSPACE\.cuda-cache") {
+          Remove-Item -Recurse -Force "$env:GITHUB_WORKSPACE\.cuda-cache"
+        }
+      shell: powershell
+      continue-on-error: true
+
     - name: Install CUDA Toolkit
       uses: Jimver/cuda-toolkit@v0.2.26
       id: cuda-toolkit
@@ -25,6 +36,7 @@ jobs:
         method: 'local'
         sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
         use-github-cache: false
+        log-file-suffix: 'windows-build.txt'
 
     - name: Verify CUDA installation
       run: |
