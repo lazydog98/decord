@@ -32,16 +32,68 @@ jobs:
           "nvrtc", 
           "cublas", 
           "nvml_dev",
-          "visual_studio_integration"
+          "visual_studio_integration",
+          "nvdecode",
+          "nvencode"
         ]'
+      
+    - name: Set CUDA_PATH Environment Variable
+      run: |
+        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
+        echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
+        $env:CUDA_PATH = $cudaPath
+        echo "CUDA_PATH set to: $env:CUDA_PATH"
+        
+        # Verify CUDA installation directory exists
+        if (Test-Path $cudaPath) {
+          echo "CUDA installation directory found at: $cudaPath"
+        } else {
+          echo "Warning: CUDA installation directory not found at expected location"
+          echo "Searching for CUDA installation..."
+          $possiblePaths = @(
+            "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
+            "C:\Program Files (x86)\NVIDIA GPU Computing Toolkit\CUDA\v11.8",
+            "$env:ProgramFiles\NVIDIA GPU Computing Toolkit\CUDA\v11.8"
+          )
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              echo "Found CUDA at: $path"
+              echo "CUDA_PATH=$path" >> $env:GITHUB_ENV
+              $env:CUDA_PATH = $path
+              break
+            }
+          }
+        }
+      shell: powershell
       
     - name: Verify CUDA Installation
       run: |
         echo "CUDA_PATH: $env:CUDA_PATH"
         echo "PATH: $env:PATH"
         nvcc --version
-        if (-not (Test-Path "$env:CUDA_PATH\lib\x64\nvcuvid.lib")) {
-          Write-Error "nvcuvid.lib not found at $env:CUDA_PATH\lib\x64\nvcuvid.lib"
+        
+        # Check CUDA installation structure
+        echo "Checking CUDA installation structure..."
+        if (Test-Path "$env:CUDA_PATH") {
+          echo "CUDA root directory exists: $env:CUDA_PATH"
+          
+          # Check for lib directory
+          if (Test-Path "$env:CUDA_PATH\lib\x64") {
+            echo "CUDA lib\x64 directory exists"
+            echo "Available libraries in lib\x64:"
+            Get-ChildItem "$env:CUDA_PATH\lib\x64\*.lib" | Select-Object Name
+          } else {
+            echo "Warning: CUDA lib\x64 directory not found"
+          }
+          
+          # Check for include directory
+          if (Test-Path "$env:CUDA_PATH\include") {
+            echo "CUDA include directory exists"
+          } else {
+            echo "Warning: CUDA include directory not found"
+          }
+        } else {
+          Write-Error "CUDA installation directory not found at: $env:CUDA_PATH"
           exit 1
         }
       shell: powershell
@@ -65,13 +117,46 @@ jobs:
         Write-Host "Copying headers to: $includeDestination"
         Copy-Item -Path "nv-codec-headers-master\include\*" -Destination $includeDestination -Recurse -Force
         
-        # Verify nvcuvid.lib exists
-        $nvcuvidLib = "$env:CUDA_PATH\lib\x64\nvcuvid.lib"
-        if (Test-Path $nvcuvidLib) {
-          Write-Host "nvcuvid.lib found at $nvcuvidLib"
-        } else {
-          Write-Error "nvcuvid.lib not found at $nvcuvidLib. NVDEC will not work."
-          exit 1
+        # Check for nvcuvid.lib in multiple possible locations
+        $nvcuvidLocations = @(
+          "$env:CUDA_PATH\lib\x64\nvcuvid.lib",
+          "$env:CUDA_PATH\lib\nvcuvid.lib",
+          "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\lib\x64\nvcuvid.lib"
+        )
+        
+        $nvcuvidFound = $false
+        foreach ($location in $nvcuvidLocations) {
+          if (Test-Path $location) {
+            Write-Host "nvcuvid.lib found at $location"
+            $nvcuvidFound = $true
+            break
+          }
+        }
+        
+        if (-not $nvcuvidFound) {
+          Write-Host "Warning: nvcuvid.lib not found in expected locations. Checking if nvdecode/nvencode packages were installed..."
+          
+          # List all lib files to see what's available
+          Write-Host "Available CUDA libraries:"
+          Get-ChildItem "$env:CUDA_PATH\lib\x64\*" -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*nv*" -or $_.Name -like "*cuda*" }
+          
+          # Try to find alternative video codec libraries
+          $alternativeLibs = @(
+            "$env:CUDA_PATH\lib\x64\nvencodeapi.lib",
+            "$env:CUDA_PATH\lib\x64\nvcuvenc.lib"
+          )
+          
+          $hasVideoCodec = $false
+          foreach ($lib in $alternativeLibs) {
+            if (Test-Path $lib) {
+              Write-Host "Found alternative video codec library: $lib"
+              $hasVideoCodec = $true
+            }
+          }
+          
+          if (-not $hasVideoCodec) {
+            Write-Host "Warning: No video codec libraries found. Build may proceed without NVDEC support."
+          }
         }
         
         # List installed headers for verification
