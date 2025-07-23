@@ -173,10 +173,10 @@ cmake -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release"
 To enable NVDEC hardware accelerated decoding on Windows, you need:
 
 1. **NVIDIA GPU** with hardware video decoding support (Maxwell generation or newer)
-2. **CUDA Toolkit** (version 8.0 or later, **recommended: 12.5**) - Download from [NVIDIA Developer](https://developer.nvidia.com/cuda-toolkit)
+2. **CUDA Toolkit** (version 8.0 or later, **recommended: 12.5.0**) - Download from [NVIDIA Developer](https://developer.nvidia.com/cuda-toolkit)
 3. **NVIDIA Video Codec SDK** - Download from [NVIDIA Developer](https://developer.nvidia.com/nvidia-video-codec-sdk)
 
-**Note on CUDA Version**: We recommend using CUDA 12.5 (latest stable) as it provides:
+**Note on CUDA Version**: We recommend using CUDA 12.5.0 (latest stable) as it provides:
 - Better performance and stability
 - Enhanced NVDEC capabilities
 - Forward and backward compatibility with older GPU drivers
@@ -230,7 +230,7 @@ The script will:
 - Run basic installation tests
 
 **Script Parameters:**
-- `-CudaVersion`: CUDA version to install (default: "12.5")
+- `-CudaVersion`: CUDA version to install (default: "12.5.0")
 - `-BuildType`: CMake build type (default: "Release")
 - `-Generator`: Visual Studio generator (default: "Visual Studio 17 2022")
 - `-SkipDependencies`: Skip dependency installation
