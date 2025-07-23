@@ -43,7 +43,7 @@
 #>
 
 param(
-    [string]$CudaVersion = "12.6",
+    [string]$CudaVersion = "12.5",
     [string]$BuildType = "Release",
     [string]$Generator = "Visual Studio 17 2022",
     [string]$Architecture = "x64",

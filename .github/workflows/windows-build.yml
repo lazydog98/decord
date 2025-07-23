@@ -24,7 +24,7 @@ jobs:
     - name: Install CUDA Toolkit
       uses: Jimver/cuda-toolkit@v0.2.11
       with:
-        cuda: '12.6'
+        cuda: '12.5'
         method: 'network'
         sub-packages: '[
           "nvcc", 
