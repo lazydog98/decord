@@ -1,0 +1,41 @@
+name: Build Decord with CUDA (Windows)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install CUDA Toolkit
+      run: |
+        choco install cuda --version=11.8 -y
+        refreshenv
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Build Tools
+      run: |
+        pip install wheel numpy cython
+        choco install cmake -y
+        choco install visualstudio2022buildtools -y
+
+    - name: Build Decord
+      run: |
+        python setup.py build_ext --inplace
+        python setup.py bdist_wheel
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: decord-cuda-wheel
+        path: dist/*.whl
