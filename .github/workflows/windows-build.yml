@@ -17,36 +17,47 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Clear any existing CUDA cache
+    - name: Install CUDA Toolkit
       run: |
-        if (Test-Path "$env:RUNNER_TOOL_CACHE\cuda") {
-          Remove-Item -Recurse -Force "$env:RUNNER_TOOL_CACHE\cuda"
-        }
-        if (Test-Path "$env:GITHUB_WORKSPACE\.cuda-cache") {
-          Remove-Item -Recurse -Force "$env:GITHUB_WORKSPACE\.cuda-cache"
+        choco install cuda -y --force
+        echo "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9" >> $env:GITHUB_ENV
+        echo "PATH=$env:PATH;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin" >> $env:GITHUB_ENV
+      shell: powershell
+      
+    - name: Verify CUDA Installation
+      run: |
+        echo "CUDA_PATH: $env:CUDA_PATH"
+        echo "PATH: $env:PATH"
+        nvcc --version
+        
+        # Check CUDA installation structure
+        echo "Checking CUDA installation structure..."
+        if (Test-Path "$env:CUDA_PATH") {
+          echo "CUDA root directory exists: $env:CUDA_PATH"
+          
+          # Check for lib directory
+          if (Test-Path "$env:CUDA_PATH\lib\x64") {
+            echo "CUDA lib\x64 directory exists"
+            echo "Available libraries in lib\x64:"
+            Get-ChildItem "$env:CUDA_PATH\lib\x64\*.lib" | Select-Object Name
+          } else {
+            echo "Warning: CUDA lib\x64 directory not found"
+          }
+          
+          # Check for include directory
+          if (Test-Path "$env:CUDA_PATH\include") {
+            echo "CUDA include directory exists"
+          } else {
+            echo "Warning: CUDA include directory not found"
+          }
+        } else {
+          Write-Error "CUDA installation directory not found at: $env:CUDA_PATH"
+          exit 1
         }
       shell: powershell
-      continue-on-error: true
-
-    - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.24
-      id: cuda-toolkit
-      with:
-        cuda: '12.5.0'
-        method: 'local'
-        sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
-        use-github-cache: false
-        log-file-suffix: 'windows-build.txt'
-
-    - name: Verify CUDA installation
-      run: |
-        echo "CUDA installation path: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-        echo "CUDA version: ${{ steps.cuda-toolkit.outputs.cuda }}"
-        nvcc --version
-        nvidia-smi || echo "nvidia-smi not available (expected in CI)"
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
@@ -70,17 +81,21 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DUSE_CUDA=ON -DCudaToolkitDir="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" -DCMAKE_CUDA_COMPILER="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\\bin\\nvcc.exe" -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" -DFFMPEG_INCLUDE_DIR="d:/ffmpeg-4.2.1-win64-dev/include" -DFFMPEG_LIBRARIES="d:/ffmpeg-4.2.1-win64-dev/lib/*.lib" ..
+        echo "Using CUDA_PATH: $env:CUDA_PATH"
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DUSE_CUDA=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" -DFFMPEG_INCLUDE_DIR="d:/ffmpeg-4.2.1-win64-dev/include" -DFFMPEG_LIBRARIES="d:/ffmpeg-4.2.1-win64-dev/lib/*.lib" ..
+      shell: powershell
 
     - name: Build
       run: |
         cd build
         cmake --build . --config Release
+      shell: powershell
 
     - name: Build Python wheel
       run: |
         cd python
         python setup.py bdist_wheel
+      shell: powershell
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -93,4 +108,5 @@ jobs:
         cd python/dist
         $wheel = Get-ChildItem *.whl | Select-Object -First 1
         pip install $wheel.FullName --force-reinstall
-        python -c "import decord; print(decord.__version__); print('CUDA support available')"
+        python -c "import decord; print('Decord version:', decord.__version__); print('CUDA support:', hasattr(decord, 'gpu')); import decord.ndarray as nd; print('NDArray module loaded successfully')"
+      shell: powershell
