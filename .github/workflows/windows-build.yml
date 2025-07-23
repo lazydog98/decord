@@ -11,11 +11,46 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Install CUDA Toolkit
+      uses: Jimver/cuda-toolkit@v0.2.11
+      with:
+        cuda: '12.6'
+        method: 'network'
+        sub-packages: '[
+          "nvcc", 
+          "cudart", 
+          "nvrtc", 
+          "cublas", 
+          "nvml_dev",
+          "visual_studio_integration"
+        ]'
+
+    - name: Install NVIDIA Video Codec SDK
       run: |
-        choco install cuda --version=11.8 -y
+        # Download and extract Video Codec SDK headers
+        $url = "https://github.com/FFmpeg/nv-codec-headers/archive/refs/heads/master.zip"
+        Invoke-WebRequest -Uri $url -OutFile "nv-codec-headers.zip"
+        Expand-Archive -Path "nv-codec-headers.zip" -DestinationPath "."
+        
+        # Copy headers to CUDA include directory
+        $cudaPath = $env:CUDA_PATH
+        Copy-Item -Path "nv-codec-headers-master\include\*" -Destination "$cudaPath\include\" -Recurse -Force
+        
+        # Verify nvcuvid.lib exists
+        if (Test-Path "$cudaPath\lib\x64\nvcuvid.lib") {
+          Write-Host "nvcuvid.lib found at $cudaPath\lib\x64\nvcuvid.lib"
+        } else {
+          Write-Host "Warning: nvcuvid.lib not found. NVDEC may not work properly."
+        }
+      shell: powershell
+
+    - name: Install FFmpeg
+      run: |
+        choco install ffmpeg -y
         refreshenv
 
     - name: Set up Python
@@ -25,17 +60,41 @@ jobs:
 
     - name: Install Build Tools
       run: |
-        pip install wheel numpy cython
+        pip install wheel numpy cython setuptools
         choco install cmake -y
-        choco install visualstudio2022buildtools -y
 
-    - name: Build Decord
+    - name: Install Visual Studio Build Tools
+      uses: microsoft/setup-msbuild@v1.3
+
+    - name: Configure CMake with CUDA
       run: |
+        mkdir build
+        cd build
+        cmake .. -DUSE_CUDA=ON -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64
+      env:
+        CUDA_PATH: ${{ env.CUDA_PATH }}
+
+    - name: Build C++ Library
+      run: |
+        cd build
+        cmake --build . --config Release --parallel
+
+    - name: Build Python Wheel
+      run: |
+        cd python
         python setup.py build_ext --inplace
         python setup.py bdist_wheel
+      env:
+        CUDA_PATH: ${{ env.CUDA_PATH }}
+
+    - name: Test Import
+      run: |
+        cd python
+        pip install dist/*.whl
+        python -c "import decord; print('Decord version:', decord.__version__); print('CUDA support:', hasattr(decord, 'gpu'))"
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: decord-cuda-wheel
-        path: dist/*.whl
+        path: python/dist/*.whl
