@@ -27,7 +27,7 @@ jobs:
         $args = "-s nvcc_11.8 cudart_11.8 nvrtc_11.8 cublas_11.8 nvml_dev_11.8 visual_studio_integration_11.8 nvdecode_11.8 nvencode_11.8"
         $maxRetries = 3
         for ($i=1; $i -le $maxRetries; $i++) {
-          Write-Host "Attempt $i: Installing CUDA Toolkit..."
+          Write-Host "Attempt ${i}: Installing CUDA Toolkit..."
           try {
             Start-Process -FilePath $installer -ArgumentList $args -Wait -NoNewWindow -PassThru
             if ($LASTEXITCODE -eq 0) {
