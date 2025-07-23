@@ -2,7 +2,9 @@ name: Build Decord with CUDA (Windows)
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -12,11 +14,23 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        submodules: recursive
 
     - name: Install CUDA Toolkit
+      uses: Jimver/cuda-toolkit@v0.2.11
+      id: cuda-toolkit
+      with:
+        cuda: '11.8'
+        method: 'network'
+        sub-packages: '["nvcc", "cudart", "nvrtc", "curand", "cublas", "thrust", "nvml"]'
+
+    - name: Verify CUDA installation
       run: |
-        choco install cuda --version=11.8 -y
-        refreshenv
+        echo "CUDA installation path: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+        echo "CUDA version: ${{ steps.cuda-toolkit.outputs.cuda }}"
+        nvcc --version
+        nvidia-smi || echo "nvidia-smi not available (expected in CI)"
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -27,15 +41,43 @@ jobs:
       run: |
         pip install wheel numpy cython
         choco install cmake -y
-        choco install visualstudio2022buildtools -y
 
-    - name: Build Decord
+    - name: Download FFmpeg libs
       run: |
-        python setup.py build_ext --inplace
+        curl -O -L https://github.com/zhreshold/decord-distro/files/5314603/ffmpeg-4.2.1-win64-dev.zip
+        curl -O -L https://github.com/vmlankub/CloudFiles/raw/5ec06ef8b7568cc3b84d310ef146c63c5e693b54/ffmpeg/ffmpeg-4.2.1-win64-shared.zip
+
+    - name: Extract FFmpeg libs
+      shell: powershell
+      run: |
+        Expand-Archive -LiteralPath ffmpeg-4.2.1-win64-dev.zip -DestinationPath d:\
+        Expand-Archive -LiteralPath ffmpeg-4.2.1-win64-shared.zip -DestinationPath d:\
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DUSE_CUDA=ON -DCudaToolkitDir="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" -DCMAKE_CUDA_COMPILER="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\\bin\\nvcc.exe" -DCMAKE_CUDA_ARCHITECTURES="60;61;70;75;80;86" -DFFMPEG_INCLUDE_DIR="d:/ffmpeg-4.2.1-win64-dev/include" -DFFMPEG_LIBRARIES="d:/ffmpeg-4.2.1-win64-dev/lib/*.lib" ..
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release
+
+    - name: Build Python wheel
+      run: |
+        cd python
         python setup.py bdist_wheel
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: decord-cuda-wheel
-        path: dist/*.whl
+        path: python/dist/*.whl
+
+    - name: Sanity test
+      run: |
+        cd python/dist
+        $wheel = Get-ChildItem *.whl | Select-Object -First 1
+        pip install $wheel.FullName --force-reinstall
+        python -c "import decord; print(decord.__version__); print('CUDA support available')"

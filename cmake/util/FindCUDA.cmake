@@ -40,7 +40,20 @@
 macro(find_cuda use_cuda)
   set(__use_cuda ${use_cuda})
   if(__use_cuda STREQUAL "ON")
-    find_package(CUDA QUIET)
+    # Try to find CUDA using find_package first
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+      set(CUDA_FOUND TRUE)
+      set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_TARGET_DIR})
+      set(CUDA_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIRS})
+      message(STATUS "Found CUDA using CUDAToolkit: ${CUDA_TOOLKIT_ROOT_DIR}")
+    else()
+      # Fallback to legacy CUDA detection
+      find_package(CUDA QUIET)
+      if(CUDA_FOUND)
+        message(STATUS "Found CUDA using legacy method: ${CUDA_TOOLKIT_ROOT_DIR}")
+      endif()
+    endif()
   elseif(IS_DIRECTORY ${__use_cuda})
     set(CUDA_TOOLKIT_ROOT_DIR ${__use_cuda})
     message(STATUS "Custom CUDA_PATH=" ${CUDA_TOOLKIT_ROOT_DIR})
@@ -55,6 +68,18 @@ macro(find_cuda use_cuda)
         ${CUDA_TOOLKIT_ROOT_DIR}/lib64
         ${CUDA_TOOLKIT_ROOT_DIR}/lib)
     endif(MSVC)
+  endif()
+  
+  # Additional validation for CUDA installation
+  if(CUDA_FOUND AND NOT CUDA_TOOLKIT_ROOT_DIR)
+    message(WARNING "CUDA found but CUDA_TOOLKIT_ROOT_DIR is not set. Trying to detect...")
+    if(DEFINED ENV{CUDA_PATH})
+      set(CUDA_TOOLKIT_ROOT_DIR $ENV{CUDA_PATH})
+      message(STATUS "Using CUDA_PATH environment variable: ${CUDA_TOOLKIT_ROOT_DIR}")
+    elseif(DEFINED ENV{CUDA_HOME})
+      set(CUDA_TOOLKIT_ROOT_DIR $ENV{CUDA_HOME})
+      message(STATUS "Using CUDA_HOME environment variable: ${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()
   endif()
 
   # additional libraries

@@ -24,7 +24,11 @@ decord_option(USE_MSVC_MT "Build with MT" OFF)
 
 # Project
 if(USE_CUDA)
-project(decord C CXX CUDA)
+  # Enable CUDA language support
+  enable_language(CUDA)
+  project(decord C CXX CUDA)
+else()
+  project(decord C CXX)
 endif(USE_CUDA)
 
 # include directories
