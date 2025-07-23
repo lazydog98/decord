@@ -154,7 +154,7 @@ python3 setup.py install --user
 For windows, you will need CMake and Visual Studio for C++ compilation.
 
 -   First, install `git`, `cmake`, `ffmpeg` and `python`. You can use [Chocolatey](https://chocolatey.org/) to manage packages similar to Linux/Mac OS.
--   Second, install [`Visual Studio 2017 Community`](https://visualstudio.microsoft.com/), this my take some time.
+-   Second, install [`Visual Studio 2017 Community`](https://visualstudio.microsoft.com/) or later, this may take some time.
 
 When dependencies are ready, open command line prompt:
 
@@ -167,6 +167,73 @@ cd build
 cmake -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -G "Visual Studio 15 2017 Win64" ..
 # open `decord.sln` and build project
 ```
+
+##### Enabling NVDEC Hardware Acceleration on Windows
+
+To enable NVDEC hardware accelerated decoding on Windows, you need:
+
+1. **NVIDIA GPU** with hardware video decoding support (Maxwell generation or newer)
+2. **CUDA Toolkit** (version 8.0 or later, **recommended: 12.6**) - Download from [NVIDIA Developer](https://developer.nvidia.com/cuda-toolkit)
+3. **NVIDIA Video Codec SDK** - Download from [NVIDIA Developer](https://developer.nvidia.com/nvidia-video-codec-sdk)
+
+**Note on CUDA Version**: We recommend using CUDA 12.6 (latest) as it provides:
+- Better performance and stability
+- Enhanced NVDEC capabilities
+- Forward and backward compatibility with older GPU drivers
+- Latest compiler optimizations and bug fixes
+- Support for newer GPU architectures
+
+After installing CUDA Toolkit and Video Codec SDK:
+
+```bash
+cd your-workspace
+git clone --recursive https://github.com/dmlc/decord
+cd decord
+mkdir build
+cd build
+# Enable CUDA support
+cmake -DUSE_CUDA=ON -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -G "Visual Studio 15 2017 Win64" ..
+# open `decord.sln` and build project
+```
+
+**Note**: If you encounter issues with `nvcuvid.lib` not being found, ensure that:
+- The NVIDIA Video Codec SDK is properly installed
+- The `nvcuvid.lib` file is present in `%CUDA_PATH%\lib\x64\` directory
+- If using a custom CUDA path, specify it: `-DUSE_CUDA=/path/to/cuda`
+
+For newer Visual Studio versions (2019/2022), use the appropriate generator:
+```bash
+# For Visual Studio 2019
+cmake -DUSE_CUDA=ON -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -G "Visual Studio 16 2019" -A x64 ..
+# For Visual Studio 2022
+cmake -DUSE_CUDA=ON -DCMAKE_CXX_FLAGS="/DDECORD_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -G "Visual Studio 17 2022" -A x64 ..
+```
+
+##### Automated Windows Build Script
+
+For convenience, we provide an automated PowerShell script that handles the entire build process including dependency installation:
+
+```powershell
+# Run from the project root directory
+.\tools\build_windows_cuda.ps1
+
+# Or with custom options
+.\tools\build_windows_cuda.ps1 -CudaVersion "11.8" -BuildType "Debug" -EnableTests
+```
+
+The script will:
+- Install required dependencies (Chocolatey, CMake, FFmpeg, Python packages)
+- Download and install CUDA Toolkit
+- Install NVIDIA Video Codec SDK headers
+- Configure and build both C++ library and Python wheel
+- Run basic installation tests
+
+**Script Parameters:**
+- `-CudaVersion`: CUDA version to install (default: "12.6")
+- `-BuildType`: CMake build type (default: "Release")
+- `-Generator`: Visual Studio generator (default: "Visual Studio 17 2022")
+- `-SkipDependencies`: Skip dependency installation
+- `-EnableTests`: Enable building C++ tests
 
 ## Usage
 

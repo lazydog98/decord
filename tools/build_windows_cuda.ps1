@@ -222,7 +222,7 @@ function Build-Decord {
     Set-Location $rootDir
     
     # Create build directory
-    $buildDir = "build"
+    $buildDir = "build" 
     if (Test-Path $buildDir) {
         Write-ColorOutput "Removing existing build directory..." "Cyan"
         Remove-Item $buildDir -Recurse -Force
