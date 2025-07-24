@@ -68,14 +68,119 @@ jobs:
 
     - name: Download FFmpeg libs
       run: |
-        curl -O -L https://github.com/zhreshold/decord-distro/files/5314603/ffmpeg-4.2.1-win64-dev.zip
-        curl -O -L https://github.com/vmlankub/CloudFiles/raw/5ec06ef8b7568cc3b84d310ef146c63c5e693b54/ffmpeg/ffmpeg-4.2.1-win64-shared.zip
+        # Download FFmpeg development libraries with retry logic
+        $maxRetries = 3
+        $retryCount = 0
+        
+        do {
+          try {
+            Write-Host "Attempting to download FFmpeg dev libraries (attempt $($retryCount + 1)/$maxRetries)..."
+            Invoke-WebRequest -Uri "https://github.com/zhreshold/decord-distro/files/5314603/ffmpeg-4.2.1-win64-dev.zip" -OutFile "ffmpeg-4.2.1-win64-dev.zip" -UseBasicParsing
+            
+            # Verify the download
+            if ((Get-Item "ffmpeg-4.2.1-win64-dev.zip").Length -gt 1MB) {
+              Write-Host "FFmpeg dev libraries downloaded successfully"
+              break
+            } else {
+              throw "Downloaded file is too small, likely corrupted"
+            }
+          } catch {
+            Write-Host "Download failed: $($_.Exception.Message)"
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+              Write-Host "Retrying in 5 seconds..."
+              Start-Sleep -Seconds 5
+            }
+          }
+        } while ($retryCount -lt $maxRetries)
+        
+        if ($retryCount -eq $maxRetries) {
+          Write-Error "Failed to download FFmpeg dev libraries after $maxRetries attempts"
+          exit 1
+        }
+        
+        # Download FFmpeg shared libraries with retry logic
+        $retryCount = 0
+        do {
+          try {
+            Write-Host "Attempting to download FFmpeg shared libraries (attempt $($retryCount + 1)/$maxRetries)..."
+            Invoke-WebRequest -Uri "https://github.com/vmlankub/CloudFiles/raw/5ec06ef8b7568cc3b84d310ef146c63c5e693b54/ffmpeg/ffmpeg-4.2.1-win64-shared.zip" -OutFile "ffmpeg-4.2.1-win64-shared.zip" -UseBasicParsing
+            
+            # Verify the download
+            if ((Get-Item "ffmpeg-4.2.1-win64-shared.zip").Length -gt 1MB) {
+              Write-Host "FFmpeg shared libraries downloaded successfully"
+              break
+            } else {
+              throw "Downloaded file is too small, likely corrupted"
+            }
+          } catch {
+            Write-Host "Download failed: $($_.Exception.Message)"
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+              Write-Host "Retrying in 5 seconds..."
+              Start-Sleep -Seconds 5
+            }
+          }
+        } while ($retryCount -lt $maxRetries)
+        
+        if ($retryCount -eq $maxRetries) {
+          Write-Error "Failed to download FFmpeg shared libraries after $maxRetries attempts"
+          exit 1
+        }
+      shell: powershell
 
     - name: Extract FFmpeg libs
       shell: powershell
       run: |
-        Expand-Archive -LiteralPath ffmpeg-4.2.1-win64-dev.zip -DestinationPath d:\
-        Expand-Archive -LiteralPath ffmpeg-4.2.1-win64-shared.zip -DestinationPath d:\
+        # Verify zip files before extraction
+        Write-Host "Verifying downloaded zip files..."
+        
+        try {
+          # Test the dev zip file
+          $devZip = "ffmpeg-4.2.1-win64-dev.zip"
+          if (Test-Path $devZip) {
+            Write-Host "Testing $devZip integrity..."
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($devZip)
+            $zip.Dispose()
+            Write-Host "$devZip is valid"
+          } else {
+            throw "$devZip not found"
+          }
+          
+          # Test the shared zip file
+          $sharedZip = "ffmpeg-4.2.1-win64-shared.zip"
+          if (Test-Path $sharedZip) {
+            Write-Host "Testing $sharedZip integrity..."
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($sharedZip)
+            $zip.Dispose()
+            Write-Host "$sharedZip is valid"
+          } else {
+            throw "$sharedZip not found"
+          }
+          
+          # Extract the files
+          Write-Host "Extracting FFmpeg libraries..."
+          Expand-Archive -LiteralPath $devZip -DestinationPath d:\ -Force
+          Expand-Archive -LiteralPath $sharedZip -DestinationPath d:\ -Force
+          
+          Write-Host "FFmpeg libraries extracted successfully"
+          
+        } catch {
+          Write-Error "Failed to extract FFmpeg libraries: $($_.Exception.Message)"
+          Write-Host "Attempting alternative extraction method..."
+          
+          # Try using 7-Zip if available
+          try {
+            choco install 7zip -y
+            & "C:\Program Files\7-Zip\7z.exe" x $devZip -od:\ -y
+            & "C:\Program Files\7-Zip\7z.exe" x $sharedZip -od:\ -y
+            Write-Host "Alternative extraction successful"
+          } catch {
+            Write-Error "All extraction methods failed. Please check the FFmpeg download sources."
+            exit 1
+          }
+        }
 
     - name: Configure CMake
       run: |
